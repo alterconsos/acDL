@@ -1,0 +1,424 @@
+<link rel="import" href="../bower_components/paper-button/paper-button.html">
+<link rel="import" href="../bower_components/paper-ripple/paper-ripple.html">
+<link rel="import" href="../bower_components/paper-styles/paper-styles.html">
+
+<link rel="import" href="fwk-styles.html">
+
+<dom-module id="load-view">
+<template>
+<style include="fwk-styles"></style>
+
+<style>
+    :host { width:100%; }
+    :host .title, :host .titlep { margin:10px 10px 5px 10px; color:var(--paper-indigo-a700); @apply(--paper-font-title2); }
+    :host .titlep { color:red; font-weight:bold; font-size:32px; }
+    :host .filtre { margin:5px 10px 10px 10px; padding:0 5px; border:1px solid var(--paper-indigo-a100);
+    	border-radius:5px; -webkit-border-radius:5px;}
+    :host .label {margin:5px 0 0 0; @apply(--paper-font-body2);}
+    input[is=iron-input] { @apply(--input-std1); width: 95%; vertical-align:top; margin: 0 0 10px 0;}
+    input[is=iron-input]:focus { @apply(--input-std1-focus); margin: 0 0 10px 0; }
+
+    :host .suivi { margin:10px; padding:0 5px; border:1px solid var(--paper-indigo-a100);
+    	border-radius:5px; -webkit-border-radius:5px; @apply(--paper-font-body2);}
+    :host .phase { font-weight:bold; font-style:italic; @apply(--paper-font-body3);}
+    
+</style>
+	<div class="fillerSB"></div>
+	
+	<paper-button on-tap="versdesktop" raised class$="[[backClass(status)]]">Retour à la synthèse des dumps</paper-button>
+	<div class$="[[titleClass(ptd)]]">Restauration DB [[type]] depuis [[name]]</div>
+
+	<div class$="[[filtreClass(status)]]">
+		<div class="label">Documents créés depuis (AAAAMMJJ) :</div>
+		<div class="input"><input is="iron-input" value="{{versiond::input}}"></div>
+	</div>
+	
+	<div>
+	<template is="dom-if" if="[[!encours(status)]]" >
+		<paper-button on-tap="load" raised class="orange ripple">Restaurer</paper-button>
+	</template>
+	<template is="dom-if" if="[[encours(status)]]" >
+		<template is="dom-if" if="[[!pause]]" >
+			<paper-button on-tap="setpause" raised class="blue ripple">Pause</paper-button>
+		</template>
+		<template is="dom-if" if="[[pause]]" >
+			<paper-button on-tap="reprise" raised class="blue ripple">Reprise</paper-button>
+			<paper-button on-tap="abandon" raised class="blue ripple">Abandon</paper-button>
+		</template>
+	</template>
+	</div>
+	
+	<template is="dom-if" if="[[status]]" >
+		<div class="suivi">
+			<div class="phase">[[phase]]</div>
+			<div hidden$="p1(status)">Lignes restaurées : [[cl]] sur [[nbl]] - Volume : [[editv(vc)]]
+				- [[cells]] cells; [[nodes]] nodes; [[mimes]] mimes;
+			</div>
+			<div hidden$="p2(status)">Documents restaurées : [[cd]] sur [[nbd]] - Volume des documents : [[editv(vd)]]</div>
+		</div>
+	</template>
+	
+	<paper-dialog id="confirmer" entry-animation="fade-in-animation" exit-animation="fade-out-animation">
+		<p>Waouh ! Restaurer la base de données de PRODUCTION ! Vraiment ?</p>
+		<div class="buttons">
+			<paper-button dialog-confirm>Même pas peur</paper-button>
+			<paper-button dialog-dismiss autofocus>Non, ne pas restaurer</paper-button>
+		</div>
+  	</paper-dialog>
+	
+</template>
+</dom-module>
+
+<script>
+'use strict'
+
+Polymer({
+	is : "load-view",
+	
+	properties : {
+		ptd: {type:Number, value:-1},
+		ptdname: {type:String, value:""},
+		name: {type:String, value:""},
+		status: {type:Number, value:0},
+		partiel : {type:Boolean, value:false},
+		pause : {type:Number, value:0},
+		type: {type:String, value:""},
+
+		line: {type:String, value:""},
+		versiond: {type:String, value:""},
+		
+		phase: {type:String, value:""},
+		nbl: {type:Number, value:0},
+		cl: {type:Number, value:0},
+		vc: {type:Number, value:0},
+		cd: {type:Number, value:0},
+		vd: {type:Number, value:0},
+		nbd: {type:Number, value:0},
+		batch : {type:Number, value:-1},
+
+		cells: {type:Number, value:0},
+		nodes: {type:Number, value:0},
+		mimes: {type:Number, value:0},
+
+		lines : {type:Array, value:[]},
+		docs : {type:Array, value:[]},
+		batches : {type:Array, value:[]},
+
+		filtreSrc : {type:Object, value:{}},
+		urlDest : {type:String, value:""}
+
+	},
+	
+	listeners : {
+		"confirmer.iron-overlay-closed" : "alerterClosing",
+	},
+
+	ready: function() {
+		AC.loadview = this;
+	},
+	
+	encours : function(status){
+		return status > 0 && status < 9;
+	},
+	
+	titleClass : function(ptd){
+		return ptd ? "title" : "titlep";
+	},
+	
+	backClass : function(status){
+		return !status || status == 9 ? "blue ripple" : "blue ripple disabled";
+	},
+	
+	filtreClass : function(status){
+		return !status || status == 9 ? "filtre" : "filtre disabled";
+	},
+	
+	display : function(ptd){
+		this.reset();
+		if (this.ptd != ptd){
+			this.ptd = ptd;
+			this.type = ["Production", "Test", "Développement"][ptd];
+		}
+		this.urlDest = AC.desktop.url(this.ptd);
+		this.name = AC.desktop.currentdump;
+		this.path = AC.desktop.mydp() + this.name;
+	},
+	
+	versdesktop : function(e){
+		AC.desktop.backtodesktop();
+	},
+	
+	editv : function(v){
+		const v1 = "" + v;
+		const l = v1.length;
+		if (l > 6)
+			return v1.substring(0, l - 6) + "," + v1.substring(l - 6, l - 5) + "Mo";
+		if (l > 3)
+			return v1.substring(0, l - 3) + "," + v1.substring(l - 3, l - 2) + "Ko";
+		return v1 + "o";
+	},
+	
+	reset : function(){
+		this.name = "";
+		this.status = 0;
+		this.pause = 0;
+		this.versiond = "";
+	},
+	
+	resetcpt : function(){
+		this.nbl = 0; this.cl = 0; this.vc = 0; this.nbd = 0; this.cd = 0; this.vd = 0;
+		this.mimes = 0; this.nodes = 0; this.cells = 0;
+	},
+	
+	/* Confirmer **************************************/
+	showConfirm : function(){
+		return new Promise((resolve, reject) => {
+			this.$.confirmer.open();
+			this.resolveAlerter = resolve;
+			this.rejectAlerter = reject;
+		});
+	},
+
+	alerterClosing : function(e){
+		if (e.detail.confirmed)
+			this.resolveAlerter(true);
+		else
+			this.rejectAlerter(false);
+	},
+
+	load : function(){
+		if (!this.ptd)
+			this.showConfirm().then(this.load2);
+		else
+			this.load2();
+	},
+
+	load2 : function(b){
+		AC.fs.readFile(this.path + "/filtre.json", 'utf-8', (err, data) => {
+			if (err) {
+				this.onError("Lecture de " + this.path + "/filtre.json impossible. " + err.message);
+				return;
+			}
+			try {
+				this.filtreSrc = JSON.parse(data);
+			} catch (e) {
+				this.onError("Erreur de syntaxe dans " + this.path + "/filtre.json impossible. " + err.message);
+				return;
+			}
+			if (this.encours(this.status)) return;
+			this.status = 1;
+			this.srv = AC.desktop.newServer(this.ptd, this.name, this.onDone.bind(this), this.onError.bind(this));
+// 			var f = {}
+// 			if (this.versiond) f.versiond = this.versiond;
+			this.working();
+		});
+	},
+
+	setpause : function(){
+		this.pause = 1;
+		AC.error("Pause demandée (applicable à la fin de la requête en cours)");
+	},
+	
+	reprise : function(){
+		AC.info("Reprise");
+		this.pause = 0;
+		this.working();
+	},
+	
+	abandon : function() {
+		AC.info("Chargement abandonné");
+		this.pause = 0;
+		this.reset();
+		this.resetcpt();
+		if (this.srv)
+			this.srv.close();
+	},
+	
+	enPause : function(){
+		if (this.pause == 1) {
+			AC.error("Restauration en pause");
+			this.pause = 2;
+		}	
+	},
+
+	onError : function(err){
+		AC.error(err);
+		this.pause = 2;
+	},
+
+	onDone : function(text) {
+		switch (this.status){
+		case 2 : {
+			if (text){
+				try {
+					const stats = JSON.parse(text);
+					this.vc += stats.bytes ? stats.bytes : 0;
+					this.cells += stats.cells ? stats.cells : 0;
+					this.mimes += stats.mimes ? stats.mimes : 0;
+					this.nodes += stats.nodes ? stats.nodes : 0;
+				} catch(e){
+					this.onError("Retour de restauration d'une ligne : syntaxe incorrecte");
+					return;
+				}
+			}
+			this.batch ++;
+			if (this.batch == this.batches.length) {
+				this.batch = -1;
+				this.cl++;
+			}
+			if (this.nbl == this.cl)
+				this.status = 3;
+			this.enPause();
+			this.working();
+			return;
+		}
+		case 4 : {
+			this.vd += this.docSize;
+			this.cd++;
+			if (this.nbd == this.cd)
+				this.status = 9;
+			this.enPause();
+			this.working();
+			return;
+		}
+		}
+	},
+	
+	filterdocs : function(docs) {
+		var x = [];
+		var dm = this.versiond.substring(2);
+		for(var i = 0, d = null; d = docs[i]; i++){
+			var j = d.lastIndexOf(".");
+			j = d.lastIndexOf("-", j - 1);
+			j = d.lastIndexOf("-", j - 1);
+			var dx = d.substring(j - 6, j);
+			if (dx >= dm) x.push(d);
+		}
+		return x;
+	},
+	
+	working : function(){
+		if (this.pause)
+			return;
+		switch (this.status){
+		case 1 : {
+			this.phase = "Lecture du fichier lignes.json";
+			AC.info(this.phase);
+			AC.fs.readFile(this.path + "/lignes.json", 'utf-8', (err, data) => {
+				if (err) {
+					this.onError("Lecture de " + this.path + "/lignes.json impossible. " + err.message);
+					return;
+				}
+				try {
+					this.lines = JSON.parse(data);
+				} catch (e) {
+					this.onError("Erreur de syntaxe dans " + this.path + "/lignes.json impossible. " + err.message);
+					return;
+				}
+				this.nbl = this.lines.length;
+				this.status = this.nbl ? 2 : 3;
+				this.batch = -1;
+				this.cl = 0;
+				this.enPause();
+				this.working();
+			});
+			return;
+		}
+		case 2 : {
+			if (this.batch == -1){
+				const b = this.path + "/" + this.lines[this.cl] + "line/batches.json"
+				AC.fs.readFile(b, 'utf-8', (err, data) => {
+					if (err) {
+						this.onError("Lecture impossible de " + b + " : " + err.message);
+						return;
+					}
+					try {
+						this.batches = JSON.parse(data);
+					} catch (e) {
+						this.onError("Erreur de syntaxe dans " + b + " : " + err.message);
+						return;
+					}
+					if (this.batches.length == 0) {
+						this.cl++;
+						if (this.cl == this.nbl)
+							this.status = 3;
+					} else
+						this.batch = 0;
+					this.enPause();
+					this.working();
+					return;
+				});
+				return;
+			}
+			const l = this.lines[this.cl];
+			const bx = this.batches[this.batch];
+			if (bx) {
+				this.phase = "Chargement des cellules de la ligne " + l + " - lot : " + (this.batch + 1);
+				AC.progress(this.phase, "", (this.cl + 1) + "-" + (this.batch + 1) + "/" + this.batches.length, this.nbl);
+				const z = this.path + "/" + l + "line/B" + this.batch + ".zip";
+				this.srv.load(l, z, this.batch == 0);
+			} else {
+				this.onDone(""); // Le lot était vide, aucune cellule n'était présente
+			}
+			return;
+		}
+		case 3 : {
+			this.phase = "Lecture du fichier docs.json";
+			AC.info(this.phase);
+			const p = this.path + "/docs.json";
+			AC.fs.readFile(p, 'utf-8', (err, data) => {
+				if (err) {
+					this.onError("Lecture impossible de " + p + " : " + err.message);
+					return;
+				}
+				try {
+					this.docs = this.filterdocs(JSON.parse(data));
+				} catch (e) {
+					this.onError("Erreur de syntaxe dans " + p + " : " + err.message);	
+					return;
+				}
+				this.nbd = this.docs.length;
+				this.status = 4;
+				this.enPause();
+				this.working();
+			});
+			return;
+		}
+		case 4 : {
+			this.phase = "Restauration des documents";
+			AC.progress(this.phase, null, this.cd, this.nbd);
+			let doc = this.docs[this.cd];
+			let i = doc.lastIndexOf("-");
+			i = doc.lastIndexOf("-", i - 1);
+			i = doc.lastIndexOf("-", i - 1);
+			const d = doc.substring(i + 1, i + 5);
+			let fn = this.path + "/" + d + "/" + doc;
+			let stats = null;
+			try {
+				stats = AC.fs.statSync(fn);
+			} catch (e) {
+				fn += ".gz";
+				doc += ".gz";
+				try {
+					stats = AC.fs.statSync(fn);
+				} catch(e){
+					this.onError("Fichier " + fn + " (ou .gz) non trouvé");
+					return;
+				}
+			}
+			this.docSize = stats.size;
+			this.srv.loadD(doc, fn, this.filtreSrc.url, this.urlDest);
+			return;
+		}
+		case 9 : {
+			if (this.srv)
+				this.srv.close();
+			this.phase = "Restauration terminée avec succès";
+			AC.info(this.phase);
+			return;
+		}
+		}
+	}
+	
+});
+</script>

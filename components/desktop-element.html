@@ -1,0 +1,281 @@
+<link rel="import" href="../bower_components/polymer/polymer.html">
+<link rel="import" href="../bower_components/iron-flex-layout/iron-flex-layout.html">
+<link rel="import" href="../bower_components/neon-animation/neon-animated-pages.html">
+<link rel="import" href="../bower_components/neon-animation/neon-animatable.html">
+<link rel="import" href="../bower_components/neon-animation/neon-animations.html">	
+<link rel="import" href="../bower_components/paper-button/paper-button.html">
+<link rel="import" href="../bower_components/paper-ripple/paper-ripple.html">
+
+<link rel="import" href="dump-view.html">
+<link rel="import" href="load-view.html">
+<link rel="import" href="detail-view.html">
+<link rel="import" href="dir-panel.html">
+<link rel="import" href="fwk-styles.html">
+
+<dom-module id="desktop-element">
+<template>
+<style include="fwk-styles"></style>
+
+<style>
+	:host { }
+		
+	neon-animated-pages { position:inherit; }
+	neon-animatable { overflow-y:auto; top:-30px !important;}
+		
+	:host .desktop { @apply(--layout-vertical); height:100%; }
+	:host .topbar { padding:2px; }
+	:host .panels { @apply(--flex); @apply(--layout-vertical); height:100%; padding:2px; overflow-y:auto;}
+	:host dir-panel { flex-grow:2; }
+	
+	:host .title { text-align:right; @apply(--paper-font-title2); color:var(--paper-indigo-a700);
+		float:right; max-width:50%; line-height:20px;}
+	
+	:host .dump { background-color: var(--paper-blue-grey-50); color:black;
+		padding:2px 5px; margin-top:5px; @apply(--paper-font-subhead);}
+
+	:host .dump2 { font-style:italic; }
+	:host .dump3 {font-weight:bold;}
+	:host #btndetail { float:right; border:1px solid rgba(3, 169, 244, 0.23); padding:0;}
+
+	:host .btnFile { 
+		@apply(--paper-font-body1);
+		background-color: white;
+		color: var(--paper-light-blue-900);
+		text-align: center; white-space: nowrap;
+		cursor: pointer;
+		border: 1px solid var(--paper-light-blue-500); border-radius: 5px; -webkit-border-radius: 5px;
+		overflow: hidden; max-width:45%; padding:0 5px;
+	}
+	:host .btnFile:hover { color:white;	background-color: var(--paper-light-blue-900);}
+	:host .fic { @apply(--paper-font-code1); font-weight:bold;}
+	:host .fic:hover { color: white;}
+	input[type="file"]#fileElem, #form1 { visibility:hidden; width:0; height:0;}
+</style>
+	<neon-animated-pages attr-for-selected="id" selected="[[viewname]]" 
+		entry-animation="slide-from-left-animation" exit-animation="slide-left-animation">
+		
+		<neon-animatable id="desktop">
+		<div class="desktop">
+			<div class="topbar fillerSB">
+				<div class="title">Dump / Load des bases Alterconsos</div>
+				<div class="btnFile" on-tap="btnFileClick">Répertoire des dumps (cliquer pour changer)
+					<div class="fic">{{dirpath}}</div>
+					<form id="form1"><input type="file" id="fileElem" nwdirectory></form>
+				</div>
+				<div class="dump">
+					<template is="dom-if" if="[[!currentdump]]" >
+					<div class="dump2">Aucun dump sélectionné (load impossible)</div>
+					</template>
+					<template is="dom-if" if="[[currentdump]]" >
+					<paper-button id="btndetail" on-tap="todetail" class="blue ripple">Détail</paper-button>
+					<div>Dump sélectionné : <span class="dump3">[[editdump(currentdumpitem)]]</span></div>
+					</template>
+				</div>
+			</div>
+			<div class="panels">
+				<dir-panel ptd="0" currentdump="[[currentdump]]"></dir-panel>
+				<dir-panel ptd="1" currentdump="[[currentdump]]"></dir-panel>
+				<dir-panel ptd="2" currentdump="[[currentdump]]"></dir-panel>
+			</div>
+		</div>
+		</neon-animatable>
+		
+		<neon-animatable id="dump" ptd:"[[currentptd]]">
+			<dump-view></dump-view>
+		</neon-animatable>
+		
+		<neon-animatable id="load" ptd:"[[currentptd]]">
+			<load-view></load-view>
+		</neon-animatable>
+		
+		<neon-animatable id="detail" ptd:"[[currentptd]]">
+			<detail-view></detail-view>
+		</neon-animatable>
+		
+	</neon-animated-pages>
+</template>
+
+<script>
+  'use strict';
+
+  Polymer({
+    is: "desktop-element",
+    
+	properties : {
+		viewname : {type:String, value:"desktop"},
+		dirpath : {type:String, value:"", notify:true},
+		alldirs : {type:Array, value:[[],[],[]]},
+		currentdump : {type:String, value:""},
+		currentdumpitem : {type:Object, value:null},
+		currentptd : {type:Number, value:-1}
+	},
+  	
+	backtodesktop : function(){
+		AC.info("");
+		this.viewname = "desktop";
+	},
+
+	changeView : function(viewname) {
+		this.viewname = viewname;
+	},
+	
+	todetail : function(){
+		this.changeView("detail");
+		AC.detailview.display();
+	},
+
+    btnFileClick : function(){
+		this.$.form1.reset();
+		this.$.fileElem.click();
+	},
+	
+	setDir : function(n) {
+		if (n.length != 16) return null;
+		const ptd = AC.Util.ptd(n);
+		if (ptd == -1) return null;
+		const c = n.charAt(15);
+		const complete = c == "C";
+		if (!complete && c != "P") return null;
+		const dh = AC.Util.editDH(n.substring(1, 15));
+		if (!dh) return null;
+		return {ptd:ptd, name:n, dh:dh, partiel:complete ? "" : "partiel"};
+	},
+	
+	sortDirs : function(dirs) {
+		if (!dirs || dirs.length < 2) return dirs;
+		dirs.sort((a,b) => a.dh < b.dh ? 1 : (a.dh > b.dh ? -1 : 0) );
+		for(let i = 0; i < dirs.length; i++) {
+			const d = dirs[i];
+			console.log("Dir : " + d.ptd + d.dh + d.partiel);
+		}
+	},
+	
+	scan : function(dirpath){
+		this.currentdump = "";
+		this.currentdumpitem = null;
+		if (!dirpath)
+			dirpath = this.dirpath;
+		else
+			this.dirpath = dirpath;
+		if (dirpath != this.prefs.dir) {
+			this.prefs.dir = dirpath;
+			this.savePrefs();
+		}
+		this.alldirs = [[],[],[]];
+		AC.fs.readdir(dirpath, (err, files) => {
+			if (!err && files && files.length != 0) {
+				files.forEach((dir) => {
+					const d = this.setDir(dir);
+					if (d)
+						this.alldirs[d.ptd].push(d);
+				});
+				for(let i = 0; i < 3; i++) {
+					this.sortDirs(this.alldirs[i]);
+					AC.dirpanels[i].refresh(this.alldirs[i]);
+				}
+			};
+		});
+	},
+	
+	editdump : function(x){
+		return !x ? "" : ["Prod ", "Test ", "Dev "][x.ptd] + x.dh + " " + x.partiel;
+	},
+	
+	selectdump : function(dump){
+		if (dump.name == this.currentdump) {
+			this.currentdumpitem = null;
+			this.currentdump = "";
+		} else {
+			this.currentdumpitem = dump;
+			this.currentdump = dump.name;
+		}
+	},
+	
+	newdumpdir : function(ptd, partiel){
+		const n = ["P","T","D"][ptd] + new Date().dumpName() + "A";
+		try {
+			AC.fs.mkdirSync(this.dirpath + "/" + n);
+			return n;
+		} catch(e) {
+		    return e.code != 'EEXIST' ? null : n;
+		}
+	},
+	
+	mydp : function() {
+		return this.dirpath.endsWith("/") ? this.dirpath : this.dirpath + "/";
+	},
+	
+	commitdir : function(name, partiel, cb){
+		const p1 = this.mydp() + name;
+		const p2 = p1.substring(0, p1.length - 1) + (partiel ? "P" : "C");
+		AC.fs.rename(p1, p2, (err) => {
+			if (err) {
+				console.log("rename error : " + err.message);
+				if (cb) 
+					cb(err);
+			} else {
+				if (cb) 
+					cb();
+				this.scan();
+			}
+		});
+	},
+		
+	newServer : function(ptd, dumpName, done, err){
+		const p = this.mydp() + (dumpName ? dumpName : this.currentdump);
+		return new AC.Server(this.url(ptd), this.pwd(ptd), p, done, err);
+	},
+	
+	url : function(ptd){
+		return this.prefs["url" + ["P", "T", "D"][ptd]];
+	},
+
+	pwd : function(ptd){
+		return this.prefs["pwd" + ["P", "T", "D"][ptd]];
+	},
+
+	updateurlpwd : function(ptd, url, pwd){
+		this.prefs["pwd" + ["P", "T", "D"][ptd]] = pwd;
+		this.prefs["url" + ["P", "T", "D"][ptd]] = url;
+		this.savePrefs();
+	},
+	
+	savePrefs : function(){
+		const data = JSON.stringify(this.prefs);
+		AC.fs.writeFile(this.prefsfile, data, (err) => {
+		    if(err)
+		        alert("La sauvegarde des préférences (.acdumpRst) dans le home a échoué") ;
+		});
+		for(let i = 0; i < 3; i++) 
+			AC.dirpanels[i].changeUrl();
+	},
+	
+	loadPrefs : function(data){
+		// {dir: urlP: pwdP: urlT: ... }
+		this.prefs = {};
+		try {
+			this.prefs = JSON.parse(data);
+		} catch (e) { }
+		if (this.prefs.dir)
+			this.scan(this.prefs.dir);
+		for(let i = 0; i < 3; i++) 
+			AC.dirpanels[i].changeUrl();
+	},
+	
+    ready: function() {
+		AC.desktop = this;
+		console.log(global.__dirname);
+		this.$.fileElem.addEventListener("change", (ev) => {
+			const tg = ev.target; 
+			this.scan(tg.files[0].path);
+		});
+		this.homedir = process.env[process.platform == "win32" ? "USERPROFILE" : "HOME" ];
+		this.prefsfile = this.homedir + "/.acSvgRst.json";
+		AC.fs.readFile(this.prefsfile, 'utf-8', (err, data) => {
+			this.loadPrefs(err ? "{}" : data);
+		});
+    },
+		
+  });
+</script>
+</dom-module>

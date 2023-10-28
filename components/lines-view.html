@@ -1,0 +1,559 @@
+<link rel="import" href="../bower_components/paper-button/paper-button.html">
+<link rel="import" href="../bower_components/paper-ripple/paper-ripple.html">
+<link rel="import" href="../bower_components/iron-flex-layout/iron-flex-layout-classes.html">
+<link rel="import" href="../bower_components/iron-autogrow-textarea/iron-autogrow-textarea.html">
+<link rel="import" href="../bower_components/iron-icons/av-icons.html">
+
+<link rel="import" href="fwk-styles.html">
+
+<dom-module id="lines-view">
+<template>
+<style include="fwk-styles"></style>
+<style is="custom-style" include="iron-flex iron-flex-alignment"></style>
+
+<style>
+    :host { @apply(--layout-vertical); height:100%; width:100%;}
+    
+    :host .l1 {width:100%; height: 40px; overflow:hidden;}
+    :host .l1a {margin:5px;}
+    :host .l1b {float:right; width:50%; @apply(--paper-font-body2); line-height:20px;}
+    :host .label {margin: 0 10px; @apply(--paper-font-body2); display:inline-block;}
+    :host .input {display:inline-block;}
+    :host .btngo { padding:2px; border:2px solid rgba(3, 169, 244, 0.23);}
+    input[is=iron-input] { @apply(--input-std1); width:100px; margin-bottom:5px;}
+    input[is=iron-input]:focus { @apply(--input-std1-focus); margin-bottom:4px; }
+
+    iron-autogrow-textarea, textarea { @apply(--input-std2); width: 90%; margin:0 4%;
+    	vertical-align:top; background-color:white;}
+    iron-autogrow-textarea:focus, textarea:focus { @apply(--input-std2-focus); }
+    :host textarea {overflow:auto; margin-top:2px; height:90px;}
+    
+    :host .line, :host .col, :host .rectype, :host .record, :host .field 
+    	{padding:3px; cursor:pointer; height:20px; overflow:hidden;}
+    :host .selline, :host .line:hover, :host .selcol, :host .col:hover, :host .selfield, :host .field:hover,
+    :host .selrectype, :host .rectype:hover, :host .selrecord, :host .record:hover
+    	{color:white; background-color:var(--paper-indigo-a700);}
+    
+    :host .l2 {width:100%; @apply(--layout-flex); flex-grow:2; @apply(--layout-horizontal); 
+    	@apply(--paper-font-body1); 
+    	border-top:2px solid var(--paper-blue-grey-100); border-bottom:2px solid var(--paper-blue-grey-100);}
+    :host .l2a, :host .l2b, :host .l2c, :host .l3a, :host .l3b2 {padding:5px; overflow-y:auto;}
+    :host .l2a {width:80px; border-right:2px solid var(--paper-blue-grey-100);}
+    :host .l2b {@apply(--layout-flex); flex-grow:4; border-right:2px solid var(--paper-blue-grey-100);}
+    :host .l2c {@apply(--layout-flex); flex-grow:2; }
+    :host .colType {float:right; overflow:hidden; width: 50%;}
+    
+    :host .l3 {width:100%; @apply(--layout-flex); flex-grow:2; @apply(--layout-horizontal); @apply(--paper-font-body1);}
+    :host .l4 {width:100%; @apply(--layout-flex); flex-grow:2; @apply(--paper-font-body1); 
+    	padding:5px 0; overflow-y:auto;}
+    :host .l3a {width:40%; border-right:2px solid var(--paper-blue-grey-100); @apply(--layout-vertical);}
+    :host .photo {overflow:auto;}
+    :host .l3b {@apply(--layout-flex); @apply(--layout-vertical);}
+    :host .l3b1 {height:100px; margin:0; padding:0;}
+    :host .l3b2 {@apply(--layout-flex); }
+    :host .recordIndex { width:30px; float:left; text-align:right; margin-right:10px; }
+    :host .fieldValue1 { }
+    :host .fieldName { width:30%; text-align:right; height:20px; overflow:hidden; display:inline-block; font-style:italic; font-weight:bold;}
+    :host .fieldValue2 { height:20px; overflow:hidden; margin-left: 10px; width:65%; display:inline-block;}
+    :host .fieldName2 { width:50%; text-align:right; height:20px; overflow:hidden; display:inline-block; font-style:italic; font-weight:bold;}
+    :host .fieldValue3 { height:20px; overflow:hidden; margin-left: 10px; display:inline-block;}
+    
+    :host .pagebtns { height:20px; text-align:center; }
+    :host .iconbtn { color:var(--paper-blue-grey-700); position: relative; display: inline-block; 
+    	cursor:pointer; margin:0 3px; }
+   	:host.iconbtn:hover { -webkit-transform: scale(1.4); transform: scale(1.4); }
+   	:host .iconbtn > paper-ripple { overflow: hidden; color: white; }
+    
+</style>
+	<div class="l1">
+		<div class="l1b"><div id="vline"></div><div id="vcell"></div></div>
+		<div class="l1a">
+			<div class="label">Source :</div>
+			<div class="input"><input is="iron-input" value="{{source::input}}" placeholder="C.2."></div>
+			<paper-button on-tap="filterLines" class="btngo blue ripple">Go !</paper-button>
+		</div>
+	</div>
+	
+	<div class="l2">
+		<div class="l2a">
+			<template is="dom-repeat" items="[[clines]]" as="line">
+				<div class$="[[lineClass(line,selLine)]]" on-tap="selectLine">[[line]]</div>
+			</template>
+		</div>
+		<div class="l2b">
+			<template is="dom-repeat" items="[[ccols]]" as="col">
+				<div class$="[[colClass(col,selCol)]]" on-tap="selectCol">
+					<div class="colType">[[col.type]]</div>[[col.col]] 
+				</div>
+			</template>
+		</div>
+		<div class="l2c">
+			<template is="dom-repeat" items="[[crecordtypes]]" as="recordType">
+				<div class$="[[recordTypeClass(recordType,selRecordType)]]" on-tap="selectRecordType">
+					<div class="fieldName2">[[recordType.type]]</div>
+					<div class="fieldValue3">[[recordType.count]]</div>
+				</div>
+			</template>
+		</div>
+	</div>	
+
+	<template is="dom-if" if="[[isStd(selCol)]]" >
+	<div class="l3">
+		<div class="l3a">
+			<template is="dom-if" if="[[!isPhoto(selCol)]]" >		
+			<template is="dom-if" if="[[lastpage]]" >
+				<div class="pagebtns">
+					<div class$="[[iconfr(ipage,lastpage)]]" on-tap="fastRewind">
+		      			<iron-icon icon="av:fast-rewind"></iron-icon>
+		      			<paper-ripple class="circle" recenters></paper-ripple>
+	    			</div>
+					<div class$="[[iconsn(ipage,lastpage)]]" on-tap="skipNext">
+		      			<iron-icon icon="av:skip-next"></iron-icon>
+		      			<paper-ripple class="circle" recenters></paper-ripple>
+	    			</div>
+					<div class$="[[iconsp(ipage,lastpage)]]" on-tap="skipPrevious">
+		      			<iron-icon icon="av:skip-previous"></iron-icon>
+		      			<paper-ripple class="circle" recenters></paper-ripple>
+	    			</div>
+					<div class$="[[iconff(ipage,lastpage)]]" on-tap="fastForward">
+		      			<iron-icon icon="av:fast-forward"></iron-icon>
+		      			<paper-ripple class="circle" recenters></paper-ripple>
+	    			</div>				
+				</div>
+			</template>
+			<div class="l3b2">
+			<template is="dom-repeat" items="[[disprecords]]" as="record">
+				<div class$="[[recordClass(record,selRecord)]]" on-tap="selectRecord">
+					<div class="recordIndex">[[record.__index]]</div>
+					<div class="fieldValue1">[[editField(record,selField)]]</div>
+				</div>
+			</template>
+			</div>
+			</template>
+		</div>
+		
+		<div class="l3b">
+			<div class="l3b1">
+				<textarea class="html" value="[[cfieldvalue]]"></textarea>
+			</div>
+			<div class="l3b2">
+				<template is="dom-repeat" items="[[cfields]]" as="field">
+					<div class$="[[fieldClass(field,selField)]]" on-tap="selectField">
+						<div class="fieldName">[[field]]</div>
+						<div class="fieldValue2">[[editField(selRecord,field)]]</div>
+					</div>
+				</template>
+			</div>
+		</div>
+	</div>
+	</template>
+	
+	<template is="dom-if" if="[[isPhoto(selCol)]]" >
+	<div class="l4">
+		<img class="photo" src$="[[cfieldphoto]]"></img>
+	</div>			
+	</template>
+	
+</template>
+</dom-module>
+
+<script>
+'use strict'
+
+Polymer({
+	is : "lines-view",
+	properties : {
+		mxd : {type:Number, value:20},
+		ipage : {type:Number, value:0},
+		lastpage : {type:Number, value:0},
+		error : {type:String, value:""},
+		path: {type:String, value:""},
+		
+		lines: {type:Array, value:[]},
+		
+		clines: {type:Array, value:[]},
+		col: {type:Object, value:{}},
+		ccols: {type:Array, value:[]},
+		crecordtypes: {type:Array, value:[]},
+		cfields: {type:Array, value:[]},
+		crecords: {type:Array, value:[]},
+		disprecords: {type:Array, value:[]},
+		cfieldvalue: {type:String, value:""},
+		
+		selLine: {type:String, value:""},
+		selCol: {type:Object, value:null},
+		selRecordType: {type:Object, value:null},
+		selRecord : {type:Object, value:null},
+		selField: {type:String, value:""},
+		
+		source: {type:String, value:""},
+	},
+	ready: function() {
+		AC.linesview = this;
+	},
+	display : function(path, lines){
+		this.path = path;
+		this.lines = lines;
+		this.filterLines();
+	},
+	iconfr : function(ipage,lastpage){
+		return ipage != 0 ? "iconbtn" : "iconbtn disabled";
+	},
+	iconsn : function(ipage,lastpage){
+		return lastpage != 1 && ipage != lastpage ? "iconbtn" : "iconbtn disabled";
+	},
+	iconsp : function(ipage,lastpage){
+		return lastpage != 1 && ipage != 0 ? "iconbtn" : "iconbtn disabled";
+	},
+	iconff : function(ipage,lastpage){
+		return ipage != lastpage ? "iconbtn" : "iconbtn disabled";
+	},
+	fastRewind : function(){
+		this.setDisp(0, true);
+	},
+	fastForward : function(){
+		this.setDisp(this.lastpage, true);
+	},
+	skipNext : function(){
+		this.setDisp(this.ipage + 1, true);
+	},
+	skipPrevious : function(){
+		this.setDisp(this.ipage - 1, true);
+	},
+	setDisp : function(p, setSelRecord){
+		const nd = [];
+		const s = p * this.mxd;
+		for(let i = 0, r = null; (r = this.crecords[i + s]) && i < this.mxd; i++) nd.push(r);
+		this.disprecords = nd;
+		this.ipage = p;
+		this.lastpage = Math.floor(this.crecords.length / this.mxd);
+		AC.progress("OK : " + this.selCol.col + "/" + this.selCol.type + "/" + this.selField, "", 
+				(this.ipage + 1), (this.lastpage + 1));
+		if (setSelRecord) {
+			this.selRecord = nd[0];
+			this.setField();
+		}
+	},
+	setField : function(){
+		let val = "";
+		if (this.selField && !this.selField.startsWith("_")) {
+			const vx = this.selRecord[this.selField];
+			if (typeof vx != "undefined")
+				val = vx;
+		}
+		this.cfieldvalue = val;		
+	},
+	onError : function(err){
+		this.error = err;
+	},
+	isStd : function(selCol){
+		return !selCol || (!selCol.type.startsWith("PHOTO") && !selCol.type.startsWith("HTML"));
+	},
+	isPhoto : function(selCol){
+		return selCol ? selCol.type.startsWith("PHOTO") : false;
+	},
+	lineClass : function(line, selLine){
+		return line == selLine ? "line selline" : "line";
+	},
+	colClass : function(col, selCol){
+		return col == selCol ? "col selcol" : "col";
+	},
+	recordTypeClass : function(recordType, selRecordType){
+		return recordType == selRecordType ? "rectype selrectype" : "rectype";
+	},
+	recordClass : function(record, selRecord){
+		return record == selRecord ? "record selrecord" : "record";
+	},
+	fieldClass : function(field, selField){
+		return field == selField ? "field selfield" : "field";
+	},
+	filterLines : function(newValue, oldValue){
+		AC.info("Sélection des lignes");
+		this.$.vline.innerHTML = "";
+		this.$.vcell.innerHTML = "";
+		this.clines = [];
+		this.ccols = [];
+		this.crecordtypes = [];
+		this.crecords = [];
+		this.cfields = [];
+		this.selLine = "";
+		this.selCol = null;
+		this.selRecord = null;
+		this.selRecordType = null;
+		this.selField = "";
+		this.cfieldvalue = "";
+		this.cfieldhtml = "";
+		this.cfieldphoto = "";
+		
+		if (this.lines) {
+			const cl = [];
+			for(let i = 0, l = null; l = this.lines[i]; i++){
+				if (l.startsWith(this.source))
+					cl.push(l);
+			}
+			cl.sort();
+			this.clines = cl;
+		}
+		if (this.clines.length > 0)
+			this.selLine = this.clines[0];
+		this.selectLine2();
+	},
+	selectLine : function(e){
+		this.selLine = e.model.__data__.line;
+		this.selectLine2();
+	},
+	selectLine2 : function(){
+		this.$.vline.innerHTML = "";
+		this.$.vcell.innerHTML = "";
+		this.ccols = [];
+		this.crecordtypes = [];
+		this.crecords = [];
+		this.cfields = [];
+		this.selCol = null;
+		this.selRecord = null;
+		this.selRecordType = null;
+		this.selField = "";
+		this.cfieldvalue = "";
+		this.cfieldhtml = "";
+		this.cfieldphoto = "";
+		if (!this.selLine) return;
+		this.selectLine3();
+	},
+	selectLine3 : function(){
+		this.lpath = this.path + "/" + this.selLine + "line/";
+		const p = this.lpath + "Versions.json.gz";
+		AC.fs.readFile(p, (err, data) => {
+			if (err) {
+				AC.error("Chargement en erreur de " + p + " : " + err.message);
+				return;
+			}
+			const text = AC.decoder.decode(pako.inflate(data));
+			try {
+				const vv = JSON.parse(text).Version;
+				const cversions = {};
+				let vx = 0;
+				for(let i = 0, x = null; x = vv[i]; i++){
+					if (x.version > vx) vx = x.version;
+					cversions[x.column + "_" + x.type] = x.version;
+				}
+				this.$.vline.innerHTML = "Version ligne: " + new Date(vx).stdFormat();		
+				const p = this.lpath + "batches.json";
+				AC.fs.readFile(p, "utf-8", (err, data) => {
+					if (err) {
+						AC.error("Chargement en erreur de " + p + " : " + err.message);
+						return;
+					}
+					try {
+						const ccols = [];
+						this.accols = {};
+						const bb = JSON.parse(data);
+						for(let i = 0, x = null; x = bb[i]; i++){
+							const cols = x.split(" ");
+							for(let j = 0, e = null; e = cols[j]; j++) {
+								const ix = e.lastIndexOf("_");
+								const col = e.substring(0, ix);
+								const jx = e.lastIndexOf(".");
+								const type = e.substring(ix + 1, jx);
+								if (type == "HTML") continue;
+								const ct = col + "_" + type;
+								const ext = e.substring(jx + 1);
+								const y = {ct:ct, col:col, type:type, batch:i, version:cversions[ct], ext:ext, entry:e};
+								this.accols[ct] = y;
+								ccols.push(y);
+							}
+						}
+				        this.ccols = ccols;
+				        this.selCol = ccols.length ? ccols[0] : null;
+				        this.selectCol2();
+					} catch (e){
+						this.onError("Erreur de syntaxe dans " + p + " : " + e.message);	
+						return;
+					}
+				});
+			} catch (e){
+				this.onError("Erreur de syntaxe dans " + p + " : " + e.message);	
+				return;
+			}
+		});
+	},	
+	selectCol : function(e){
+		this.selCol = e.model.__data__.col;
+		this.selectCol2();
+	},
+	selectCol2 : function(){
+		this.$.vcell.innerHTML = "";
+		this.crecordtypes = [];
+		this.crecords = [];
+		this.cfields = [];
+		this.selRecord = null;
+		this.selRecordType = null;
+		this.selField = "";
+		this.cfieldvalue = "";
+		this.cfieldhtml = "";
+		this.selectCol3();
+	},
+	selectCol3 : function(){
+		const sc = this.selCol;
+		this.$.vcell.innerHTML = "Version cell : " + new Date(sc.version).stdFormat();		
+		const p = this.lpath + "B" + this.selCol.batch + ".zip";
+		AC.fs.readFile(p, (err, data) => {
+			if (err) {
+				AC.error("Lecture impossible de " + p + " : " + err.message);
+				return;
+			}
+			try {
+				const zip = new AC.jszip(data);
+				AC.info("Unzip de " + p + ":" + sc.entry);
+				const buf = zip.file(sc.entry).asArrayBuffer();
+				let zdata = new Uint8Array(buf);
+				if (sc.type != "PHOTO"){
+					zdata = AC.decoder.decode(zdata);
+					try {
+						sc.data = JSON.parse(zdata);
+						this.selectCol4();
+					} catch(e){
+		       			AC.error("Syntaxe JSON de " + p + ":" + entry + " : ", e.message);
+					}
+					return;
+				} 
+				this.cfieldphoto = "data:image/" + sc.ext + ";base64," + AC.Base64.encode(zdata);
+				AC.info("OK : " + sc.col + "/" + sc.type);
+			} catch (e) {
+       			AC.error("Unzip en erreur de " + p + ":" + entry + " : ", e.message);
+			}
+		});
+	},
+	
+	selectCol4 : function() {
+		AC.info("Analyse des items de " + this.selCol.col + "/" + this.selCol.type);
+		const rt = [];
+		for(let t in this.selCol.data) {
+			const a = this.selCol.data[t];
+			rt.push({type:t, count:!Array.isArray(a) ? 1 : a.length});
+		}
+		rt.sort((a,b) => a.type < b.type ? -1 : (a.type > b.type ? 1 : 0));
+		this.crecordtypes = rt;
+		if (this.crecordtypes.length > 0)
+			this.selRecordType =  this.crecordtypes[0];
+		this.selectRecordType2();
+	},
+	selectRecordType : function(e){
+		this.selRecordType = e.model.__data__.recordType;
+		this.selectRecordType2();
+	},
+	selectRecordType2 : function(){
+		this.$.vcell.innerHTML = "";
+		this.crecords = [];
+		this.cfields = [];
+		this.selRecord = null;
+		this.selField = "";
+		if (!this.selRecordType) return;
+		this.selectRecordType3();
+	},
+	selectRecordType3 : function(){	
+		const fields = {};
+		let v = 0;
+		for(let rt in this.selCol.data){
+			let l = this.selCol.data[rt];
+			if (!Array.isArray(l))
+				l = [l];
+			for(let i = 0, x = null; x = l[i]; i++){
+				const vv = x.version;
+				if (vv && vv > v)
+					v = vv;
+			}
+		}
+		AC.info("Calcul de la version de " + this.selCol.col + "/" + this.selCol.type);
+		let crecords = this.selCol.data[this.selRecordType.type];
+		if (!Array.isArray(crecords))
+			crecords = [crecords];
+		for(let i = 0, r = null; r = crecords[i]; i++){
+			r.__index = i;
+			for(let f in r)
+				if (f != "ZZ" && !fields[f])
+					fields[f] = true;
+		}
+		const ff = []
+		const x = AC.sorts[this.selCol.type];
+		const keys = !x ? [] :( x[this.selRecordType.type] ? x[this.selRecordType.type] : []);
+		AC.info("Recherche des champs de " + this.selCol.col + "/" + this.selCol.type);
+		this.ckeys = {};
+		for(let i = 0, k = null; k = keys[i]; i++){
+			const name = "_" + k.join("_");
+			this.ckeys[name] = k;
+			ff.push(name);
+		}
+		for(var f in fields)
+			ff.push(f);
+		ff.sort();
+		this.cfields = ff;
+		this.selField = ff[1];
+		if (v)
+			this.$.vcell.innerHTML = "Version cell&nbsp;&nbsp;: " + new Date(v).stdFormat();
+		this.sortRecords(crecords, false);
+	},
+	selectRecord : function(e){
+		this.selRecord = e.model.__data__.record;
+		this.setField();
+	},
+	selectField : function(e){
+		this.selField = e.model.__data__.field;
+		const rx = [];
+		for(let i = 0, r = null; r = this.crecords[i]; i++) rx.push(r);
+		this.sortRecords(rx, true);
+	},
+	sortRecords : function(crecords, hasSelRecord){
+		AC.info("Edition des records de " + this.selCol.col + "/" + 
+				this.selCol.type + "/" + this.selField);
+		let np = 0;
+		if (crecords.length > 1) {
+			for(let i = 0, r = null; r = crecords[i]; i++)
+				r.ZZ = this.editField(r, this.selField);
+			if (!hasSelRecord) {
+				crecords.sort((a,b) =>
+					a.ZZ < b.ZZ ? -1 : (a.ZZ > b.ZZ ? 1 : 
+						(a.__index > b.__index ? 1 : (a.__index < b.__index ? -1 : 0))));
+			} else {
+				const isel = this.selRecord.__index;
+				crecords.sort((a,b) =>
+					a.ZZ < b.ZZ ? -1 : (a.ZZ > b.ZZ ? 1 : 
+						(a.__index > b.__index || a.__index == isel ? 1 : 
+							(a.__index < b.__index || b.__index == isel ? -1 : 0))));
+				for(let i = 0, r = null; r = crecords[i]; i++)
+					if (r.__index == isel){
+						np = Math.floor(i / this.mxd);
+						break;
+					}
+			}
+		}
+		this.crecords = crecords;
+		this.setDisp(np, !hasSelRecord);
+	},
+	editField : function(r, f){
+		if (!r || !f) return "";
+		if (f.charAt(0) == "_") {
+			const k = AC.linesview.ckeys ? AC.linesview.ckeys[f] : null;
+			if (k) {
+				let val = "";
+				for(let i = 0, f2 = ""; f2 = k[i]; i++)
+					val += AC.linesview.editField(r, f2) + " ";
+				return val;
+			}
+		}
+		const lg = AC.sorts.FieldSizes[f];
+		const v = r[f];
+		if (typeof v == 'undefined') 
+			return lg == -2 ? "0" : "";
+		if (!lg) 
+			return v;
+		if (lg == -1)
+			return new Date(v).stdFormat() + " - " + v;
+		const vx = "" + v;
+		if (vx.length < lg)
+			return "            ".substring(0, lg - vx.length) + vx;
+		else
+			return vx;
+	}
+	
+});
+</script>

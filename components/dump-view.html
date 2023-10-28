@@ -1,0 +1,501 @@
+<link rel="import" href="../bower_components/paper-button/paper-button.html">
+<link rel="import" href="../bower_components/paper-ripple/paper-ripple.html">
+<link rel="import" href="../bower_components/paper-styles/paper-styles.html">
+
+<link rel="import" href="fwk-styles.html">
+
+<dom-module id="dump-view">
+<template>
+<style include="fwk-styles"></style>
+
+<style>
+    :host { width:100%; }
+    :host .title { margin:10px 10px 5px 10px; color:var(--paper-indigo-a700); @apply(--paper-font-title2); }
+    :host .filtre { margin:5px 10px 10px 10px; padding:0 5px; border:1px solid var(--paper-indigo-a100);
+    	border-radius:5px; -webkit-border-radius:5px;}
+    :host .label {margin:5px 0 0 0; @apply(--paper-font-body2);}
+    input[is=iron-input] { @apply(--input-std1); width: 95%; vertical-align:top; margin: 0 0 10px 0;}
+    input[is=iron-input]:focus { @apply(--input-std1-focus); margin: 0 0 10px 0; }
+
+    :host .suivi { margin:10px; padding:0 5px; border:1px solid var(--paper-indigo-a100);
+    	border-radius:5px; -webkit-border-radius:5px; @apply(--paper-font-body2);}
+    :host .phase { font-weight:bold; font-style:italic; @apply(--paper-font-body3);}
+    
+</style>
+	<div class="fillerSB"></div>
+
+	<paper-button on-tap="versdesktop" raised class$="[[backClass(status)]]">Retour à la synthèse des dumps</paper-button>
+	<div class="title">Dump [[type]] : [[name]]</div>
+
+	<div class$="[[filtreClass(status)]]">
+		<div class="label">Cellules modifiées après (AAAAMMJJhhmmss) :</div>
+		<div class="input"><input is="iron-input" value="{{version::input}}"></div>
+		<div class="label">Lignes commençant par (C.1. P.2. ...) :</div>
+		<div class="input"><input is="iron-input" value="{{line::input}}"></div>
+		<div class="label">Colonnes commençant par (C.1. P.2. ...) :</div>
+		<div class="input"><input is="iron-input" value="{{col::input}}"></div>
+		<div class="label">D'un des types suivants (GAC GAP ...) :</div>
+		<div class="input"><input is="iron-input" value="{{types::input}}"></div>
+		<div class="label">Documents créés depuis (AAAAMMJJ) :</div>
+		<div class="input"><input is="iron-input" value="{{versiond::input}}"></div>
+	</div>
+	
+	<div>
+	<template is="dom-if" if="[[!encours(status)]]" >
+		<paper-button on-tap="dump" raised class="orange ripple">Nouveau Dump</paper-button>
+	</template>
+	<template is="dom-if" if="[[encours(status)]]" >
+		<template is="dom-if" if="[[!pause]]" >
+			<paper-button on-tap="setpause" raised class="blue ripple">Pause</paper-button>
+		</template>
+		<template is="dom-if" if="[[pause]]" >
+			<paper-button on-tap="reprise" raised class="blue ripple">Reprise</paper-button>
+			<paper-button on-tap="abandon" raised class="blue ripple">Abandon</paper-button>
+		</template>
+	</template>
+	</div>
+	
+	<template is="dom-if" if="[[status]]" >
+		<div class="suivi">
+			<div class="phase">[[phase]]</div>
+			<div hidden$="p1(status)">Lignes dumpées : [[cl]] sur [[nbl]] - Volume compressé des lignes : [[editv(vc)]]</div>
+			<div hidden$="p2(status)">Documents dumpés : [[cd]] sur [[nbd]] - Volume des documents : [[editv(vd)]]</div>
+		</div>
+	</template>	
+	
+</template>
+</dom-module>
+
+<script>
+'use strict'
+
+Polymer({
+	is : "dump-view",
+	
+	properties : {
+		ptd: {type:Number, value:-1},
+		ptdname: {type:String, value:""},
+		name: {type:String, value:""},
+		status: {type:Number, value:0},
+		partiel : {type:Boolean, value:false},
+		pause : {type:Number, value:0},
+		type: {type:String, value:""},
+
+		version: {type:String, value:""},
+		line: {type:String, value:""},
+		col: {type:String, value:""},
+		types: {type:String, value:""},
+		versiond: {type:String, value:""},
+		
+		phase: {type:String, value:""},
+		nbl: {type:Number, value:0},
+		cl: {type:Number, value:0},
+		vc: {type:Number, value:0},
+		cd: {type:Number, value:0},
+		nbd: {type:Number, value:0},
+		
+		lines : {type:Array, value:[]},
+		docs : {type:Array, value:[]}
+		
+	},
+	
+	ready: function() {
+		AC.dumpview = this;
+	},
+	
+	encours : function(status){
+		return status > 0 && status < 9;
+	},
+	
+	backClass : function(status){
+		return !status || status == 9 ? "blue ripple" : "blue ripple disabled";
+	},
+	
+	filtreClass : function(status){
+		return !status || status == 9 ? "filtre" : "filtre disabled";
+	},
+	
+	display : function(ptd){
+		this.reset();
+		if (this.ptd != ptd){
+			this.ptd = ptd;
+			this.type = ["Production", "Test", "Développement"][ptd];
+			this.name = "";
+		}
+	},
+	
+	versdesktop : function(e){
+		AC.desktop.backtodesktop();
+	},
+	
+	editv : function(v){
+		const v1 = "" + v;
+		const l = v1.length;
+		if (v > 1000000)
+			return v1.substring(0, l - 6) + "," + v1.substring(l - 6, l - 5) + "Mo";
+		if (v > 1000)
+			return v1.substring(0, l - 3) + "," + v1.substring(l - 3, l - 2) + "Ko";
+		return v1 + "o";
+	},
+	
+	reset : function(){
+		this.name = "";
+		this.status = 0;
+		this.pause = 0;
+		this.version = "";
+		this.line = "";
+		this.col = "";
+		this.types = "";
+		this.versiond = "";
+	},
+	
+	resetcpt : function(){
+		this.nbl = 0; this.cl = 0; this.vc = 0; this.nbd = 0; this.cd = 0; this.vd = 0;
+	},
+	
+	dump : function(){
+		if (this.encours(this.status)) return;
+		this.partiel = this.version || this.line || this.col || this.types ? true : false;
+		this.name = AC.desktop.newdumpdir(this.ptd, this.partiel);
+		if (!this.name){
+			this.name = "?";
+			AC.error("Création du directory de dump impossible");
+			return;
+		}
+		AC.info("Dump lancé. Directory : " + this.name);
+		this.status = 1;
+		this.srv = AC.desktop.newServer(this.ptd, this.name, this.onDone.bind(this), this.onError.bind(this));
+		const f = {}
+		if (this.line) f.line = this.line;
+		if (this.col) f.col = this.col;
+		if (this.types) f.types = this.types;
+		if (this.version) f.version = this.version;
+		if (this.versiond) f.versiond = this.versiond;
+		this.normalize(f);
+		f.url = AC.desktop.url(this.ptd);
+		const x = JSON.stringify(f);
+		const p = this.srv.dirName + "filtre.json";
+		AC.fs.writeFile(p, x, (err) => {
+			if (err)
+				this.onError("Ecriture impossible de " + p + " : " + err.message);
+		});
+		this.working();
+	},
+		
+	setpause : function(){
+		this.pause = 1;
+		AC.error("Pause demandée (applicable à la fin de la requête en cours)");
+	},
+	
+	reprise : function(){
+		AC.info("Reprise");
+		this.pause = 0;
+		this.working();
+	},
+	
+	abandon : function() {
+		AC.info("Dump abandonné");
+		this.pause = 0;
+		this.reset();
+		this.resetcpt();
+		if (this.srv)
+			this.srv.close();
+	},
+	
+	enPause : function(){
+		if (this.pause == 1) {
+			AC.error("Dump en pause");
+			this.pause = 2;
+		}	
+	},
+	
+	onError : function(err){
+		AC.error(err);
+		this.pause = 2;
+	},
+
+	onDone : function(text) {
+		switch (this.status){
+		case 1 : {
+			try {
+				this.lines = JSON.parse(text);
+			} catch (e){
+				this.onError("Erreur de syntaxe dans lignes.json : " + e.message);	
+				return;
+			}
+			this.nbl = this.lines.length;
+			this.cl = 0;
+			const p = this.srv.dirName + "lignes.json";
+			AC.fs.writeFile(p, text, (err) => {
+				if (err) {
+					this.onError("Ecriture impossible de " + p + " : " + err.message);
+					return;
+				}
+				for(let i = 0, l = null; l = this.lines[i]; i++) {
+					const d = this.srv.dirName + l + "line";
+					try {
+						AC.fs.mkdirSync(d);
+					} catch(e) {
+						this.onError("Impossible de créer le directory " + d + " : " + err.message);
+					}
+				}
+				this.status = this.nbl ? 2 : 4;
+				this.enPause();
+				this.working();
+				return;
+			});
+			return;
+		}
+		case 2 : {
+			this.cl++;
+			if (this.nbl == this.cl) {
+				this.cl = 0;
+				this.batch = -1;
+				this.status = 3;
+			}
+			this.enPause();
+			this.working();
+			return;
+		}
+		case 3 : {
+			this.vc += text;
+			const line = this.lines[this.cl];
+			let p = this.srv.dirName + "/" + line + "line/B" + this.batch + ".zip";
+			AC.fs.readFile(p, (err, data) => {
+				if (err) {
+					AC.error("Lecture impossible de " + p + " : " + err.message);
+					return;
+				}
+				const zip = new AC.jszip(data);
+				const ee = []
+		        for (let e in zip.files) ee.push(e);
+				this.batches[this.batch] = ee.length ? ee.join(" ") : "";
+				this.batch++;
+				if (this.batch == this.batches.length){
+					p = this.srv.dirName + "/" + line + "line/batches.json";
+					const text = JSON.stringify(this.batches);
+					AC.fs.writeFile(p, text, (err) => {
+						if (err) {
+							this.onError("Ecriture impossible de " + p + " : " + err.message);
+							return;
+						} else {}
+							this.cl++;
+							this.batch = -1;
+							if (this.nbl == this.cl)
+								this.status = 4;
+							this.enPause();
+							this.working();
+					});
+				} else {
+					this.enPause();
+					this.working();
+				}
+			});
+			return;
+		}
+		case 4 : {
+			try {
+				this.docs = JSON.parse(text);
+			} catch (e){
+				this.onError("Erreur de syntaxe dans docs.json : " + e.message);	
+				return;
+			}
+			this.nbd = this.docs.length;
+			const p = this.srv.dirName + "docs.json";
+			AC.fs.writeFile(p, text, (err) => {
+				if (err) {
+					this.onError("Ecriture impossible de " + p + " : " + err.message);
+					return;
+				}
+				this.status = this.nbd ? 5 : 6;
+				this.enPause();
+				this.working();
+				return;
+			});
+			return;
+		}
+		case 5 : {
+			this.vd += text;
+			this.cd++;
+			if (this.nbd == this.cd)
+				this.status = 6;
+			this.enPause();
+			this.working();
+			return;
+		}
+		}
+	},
+	
+	working : function(){
+		if (this.pause)
+			return;
+		switch (this.status){
+		case 1 : {
+			this.resetcpt();
+			this.phase = "Obtention de la liste des lignes";
+			AC.info(this.phase);
+			this.srv.linesS(this.line, this.version);
+			return;
+		}
+		case 2 : {
+			const l = this.lines[this.cl];
+			this.phase = "Réception de Versions de la ligne " + l;
+			AC.progress(this.phase, "", this.cl, this.nbl);
+			this.srv.dumpV(l);
+			return;
+		}
+		case 3 : {
+			if (this.batch == -1) {
+				const p = this.srv.dirName + this.lines[this.cl] + "line/Versions.json.gz";
+				AC.fs.readFile(p, null, (err, data) => {
+					if (err) {
+						this.onError("Lecture de impossible de " + p + " : " + err.message);
+						return;
+					}
+					try {
+						const d2 = AC.decoder.decode(pako.inflate(data));
+						this.versions = JSON.parse(d2);
+						this.batches = this.buildBatches(this.versions);
+						if (this.batches.length) {
+							const b = this.srv.dirName + this.lines[this.cl] + "line/batches.json";
+							const text = JSON.stringify(this.batches);
+							AC.fs.writeFile(b, text, (err) => {
+								if (err) {
+									this.onError("Impossible d'écrire " + b + " : " + err.message);
+									return;
+								}
+								this.batch = 0;
+								this.status = 3;
+								this.enPause();
+								this.working();
+							});
+							return;
+						} else {
+							this.batch = -1;
+							this.cl++;
+							if (this.cl == this.nbl)
+								this.status = 4;
+							this.enPause();
+							this.working();
+							return;
+						}
+					} catch (e) {
+						this.onError("Erreur de syntaxe dans " + p + " : " + err.message);	
+					}
+				});
+				return;
+			}
+			const l = this.lines[this.cl];
+			this.phase = "Réception des cellules de la ligne " + l + " - lot : " + (this.batch + 1);
+			AC.progress(this.phase, "", (this.cl + 1) + "-" + (this.batch + 1) + "/" + this.batches.length, this.nbl);
+			this.srv.dumpC(this.lines[this.cl], this.batches[this.batch], this.batch);
+			return;
+		}
+		case 4 : {
+			this.phase = "Obtention de la liste des documents";
+			AC.info(this.phase);
+			this.srv.docsS(this.line, this.versiond);
+			return;
+		}
+		case 5 : {
+			this.phase = "Réception des documents";
+			AC.progress(this.phase, "", this.cd, this.nbd);
+			this.srv.dumpD(this.docs[this.cd]);
+			return;
+		}
+		case 6 : {
+			if (this.srv) {
+				this.srv.close();
+				this.srv = null;
+			}
+			this.phase = "Dump terminé avec succès, renommage du directory";
+			AC.info(this.phase);
+			AC.desktop.commitdir(this.name, this.partiel, (err) => {
+				const p1 = this.name;
+				if (err) {
+					this.onError("Impossible de renommer le directory " + p1 +
+							" dans " + AC.desktop.dirpath + ". Explorer ouvert dessus ? " 
+							+ err.message);
+				} else {
+					this.name = p1.substring(0, p1.length - 1) + (this.partiel ? "P" : "C");
+					this.status = 9;
+					this.working();
+				}
+			});
+			return;
+		}
+		case 9 : {
+			this.phase = "Dump terminé avec succès, directory renommé.";
+			AC.info(this.phase);
+		}
+		}
+	},
+	
+	split : function(s){
+		if (!s) return [];
+		const a = s.split(" ");
+		const b = [];
+		for(let x in a){
+			const y = x.trim();
+			if (y)
+				b.push(y);
+		}
+		return b;
+	},
+	
+	normalize : function(f){
+		if (!f.version)
+			this.versionN = "20000101000000";
+		else {
+			if (f.version.length <= 14)
+				this.versionN = f.version + "00000000000000".substring(0, 14 - f.version.length);
+			else
+				this.versionN = f.version.substring(0, 14);
+		}
+		this.colN = this.split(f.col);
+		this.typesN = this.split(f.types);
+	},
+	
+	buildBatches : function(versions){
+		const b = [];
+		let i = 0;
+		let j = 0;
+		for(let k = 0, v = null; v = versions.Version[k]; k++){
+			if (j == 10){
+				i++;
+				j = 0;
+			}
+			const vx = new Date(v.version).format("YmdHis");
+			if (vx < this.versionN) continue;
+			let ok = true;
+			if (this.colN.length) {
+				ok = false;
+				for(let ii = 0, s = null; s = this.colN[ii]; ii++)
+					if (v.column.startsWith(s)){
+						ok = true;
+						break;
+					}
+			}
+			if (!ok) continue;
+			if (this.typesN.length) {
+				ok = false;
+				for(let ii = 0, s = null; s = this.typesN[ii]; ii++)
+					if (v.type.startsWith(s)){
+						ok = true;
+						break;
+					}
+			}
+			if (!ok) continue;
+			if (!b[i])
+				b[i] = [];
+			b[i].push(v.column + "/" + v.type);
+			j++;
+		}
+		const a = [];
+		for(let i = 0 , t = null; t = b[i]; i++)
+			a.push(t.join(" "));
+		return a;
+	}
+	
+});
+</script>
